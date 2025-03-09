@@ -12,6 +12,6 @@ namespace BackendGestionUsuarios.API.Repositories
         Task<Usuario> CrearUsuarioAsync(Usuario usuario);
         Task<bool> ActualizarUsuarioAsync(Usuario usuario);
         Task<bool> EliminarUsuarioAsync(int id);
-        Task<Usuario> ActualizarFechaAccesoAsync(int id); // Devuelve el usuario actualizado
+        Task<Usuario> ActualizarFechaAccesoAsync(int id); // Devuelve el usuario actualizado ...
     }
 }

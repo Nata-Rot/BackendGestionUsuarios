@@ -4,6 +4,8 @@ using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace BackendGestionUsuarios.API.Repositories
@@ -24,21 +26,31 @@ namespace BackendGestionUsuarios.API.Repositories
 
         public async Task<Usuario> ObtenerUsuarioPorIdAsync(int id)
         {
-            return await _context.Usuarios.FindAsync(id);
+            var usuario = await _context.Usuarios.FindAsync(id);
+            return usuario ?? throw new KeyNotFoundException($"Usuario con ID {id} no encontrado.");
         }
 
-        public async Task<Usuario> ObtenerUsuarioPorCorreoAsync(string correo)
+        public async Task<Usuario> LoginAsync(LoginDTO loginDto)
         {
-            if (string.IsNullOrWhiteSpace(correo))
+            var usuario = await _context.Usuarios
+                .Where(u => u.CorreoElectronico == loginDto.CorreoElectronico)
+                .FirstOrDefaultAsync();
+
+            if (usuario == null || usuario.Contrasena == null)
+                return null;
+
+            using (var sha256 = SHA256.Create())
             {
-                throw new ArgumentException("El correo electrónico no puede estar vacío.", nameof(correo));
+                byte[] hashIngresado = sha256.ComputeHash(Encoding.UTF8.GetBytes(loginDto.Contrasena));
+
+                if (!usuario.Contrasena.SequenceEqual(hashIngresado))
+                    return null;
             }
 
-            return await _context.Usuarios
-                .SingleOrDefaultAsync(u => u.CorreoElectronico.ToLower() == correo.ToLower());
-
-
+            return usuario;
         }
+
+
 
         public async Task<Usuario> CrearUsuarioAsync(Usuario usuario)
         {
@@ -66,13 +78,17 @@ namespace BackendGestionUsuarios.API.Repositories
         public async Task<Usuario> ActualizarFechaAccesoAsync(int id)
         {
             var usuario = await ObtenerUsuarioPorIdAsync(id);
-            if (usuario == null)
-                return null;
-
             usuario.FechaUltimoAcceso = DateTime.Now;
             _context.Usuarios.Update(usuario);
             await _context.SaveChangesAsync();
             return usuario;
         }
+        public async Task<Usuario> ObtenerUsuarioPorCorreoAsync(string correo)
+        {
+            return await _context.Usuarios
+                .Where(u => u.CorreoElectronico == correo)
+                .FirstOrDefaultAsync();
+        }
+
     }
 }

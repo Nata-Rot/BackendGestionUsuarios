@@ -1,5 +1,4 @@
 ﻿
-// Controllers/UsuariosController.cs
 using BackendGestionUsuarios.API.Models;
 using GestionUsuarios.API.Services;
 using Microsoft.AspNetCore.Authorization;

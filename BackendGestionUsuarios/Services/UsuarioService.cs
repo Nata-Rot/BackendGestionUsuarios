@@ -121,36 +121,63 @@ namespace BackendGestionUsuarios.API.Services
             try
             {
                 var usuario = await _repository.ObtenerUsuarioPorCorreoAsync(loginDto.CorreoElectronico);
-
                 if (usuario == null)
-                    return null;
-
-                // Verificar contraseña con el formato correcto
-                if (!VerifyPassword(loginDto.Contrasena, usuario.Contrasena))
-                    return null;
-
-                // Actualizar fecha de acceso
-                await _repository.ActualizarFechaAccesoAsync(usuario.Id);
-
-                // Generar token JWT
-                var token = GenerateJwtToken(usuario);
-
-                return new LoginResponseDTO
                 {
-                    Id = usuario.Id,
-                    Nombre = usuario.Nombre,
-                    Apellidos = usuario.Apellidos,
-                    Token = token
-                };
+                    Console.WriteLine("Usuario no encontrado");
+                    return null;
+                }
+
+                Console.WriteLine($"Usuario encontrado: {usuario.Nombre}");
+                Console.WriteLine($"Contraseña proporcionada: {loginDto.Contrasena}");
+
+                if (usuario.Contrasena == null)
+                {
+                    Console.WriteLine("La contraseña almacenada es null");
+                    return null;
+                }
+
+                Console.WriteLine($"Longitud de contraseña almacenada: {usuario.Contrasena.Length} bytes");
+
+                // Crear directamente el hash aquí para comparar
+                using (var sha256 = SHA256.Create())
+                {
+                    byte[] hashEntrada = sha256.ComputeHash(Encoding.UTF8.GetBytes(loginDto.Contrasena));
+                    string hashEntradaHex = BitConverter.ToString(hashEntrada).Replace("-", "");
+                    string hashAlmacenadoHex = BitConverter.ToString(usuario.Contrasena).Replace("-", "");
+
+                    Console.WriteLine($"Hash de entrada: {hashEntradaHex}");
+                    Console.WriteLine($"Hash almacenado: {hashAlmacenadoHex}");
+                    Console.WriteLine($"¿Coinciden? {hashEntradaHex.Equals(hashAlmacenadoHex, StringComparison.OrdinalIgnoreCase)}");
+
+                    if (hashEntradaHex.Equals(hashAlmacenadoHex, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Console.WriteLine("Autenticación exitosa mediante comparación directa");
+                        await _repository.ActualizarFechaAccesoAsync(usuario.Id);
+
+                        var jwtToken = GenerateJwtToken(usuario);
+
+                        return new LoginResponseDTO
+                        {
+                            Id = usuario.Id,
+                            Nombre = usuario.Nombre,
+                            Apellidos = usuario.Apellidos,
+                            Token = jwtToken
+                        };
+                    }
+                    else
+                    {
+                        Console.WriteLine("Las contraseñas no coinciden");
+                        return null;
+                    }
+                }
             }
             catch (Exception ex)
             {
-                // Agregar logging
                 Console.WriteLine($"Error en login: {ex.Message}");
-                throw; // Re-lanzar la excepción para que el controlador pueda manejarla
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                throw;
             }
         }
-
         private string CalcularTipoUsuario(DateTime? ultimoAcceso)
         {
             if (!ultimoAcceso.HasValue)
@@ -162,7 +189,7 @@ namespace BackendGestionUsuarios.API.Services
                 return "Hechicero";
             else if (horasTranscurridas <= 48)
                 return "Luchador";
-            else if (horasTranscurridas <= 168) // 7 días * 24 horas
+            else if (horasTranscurridas <= 168) 
                 return "Explorador";
             else
                 return "Olvidado";
@@ -173,13 +200,11 @@ namespace BackendGestionUsuarios.API.Services
             int puntaje = 0;
             string nombreCompleto = $"{nombre} {apellidos}";
 
-            // Calcular puntos por longitud del nombre
             if (nombreCompleto.Length > 10)
                 puntaje += 20;
             else if (nombreCompleto.Length >= 5)
                 puntaje += 10;
 
-            // Calcular puntos por dominio de correo
             string dominio = correo.Split('@').Last().ToLower();
             if (dominio == "gmail.com")
                 puntaje += 40;
@@ -191,53 +216,71 @@ namespace BackendGestionUsuarios.API.Services
             return puntaje;
         }
 
-        // Ejemplo de método para generar hash de contraseña para crear usuarios
         public byte[] HashPassword(string password)
         {
-            using (var hmac = new System.Security.Cryptography.HMACSHA512())
+            try
             {
-                // El salt es generado automáticamente por HMACSHA512
-                var salt = hmac.Key;
-                var hash = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password));
-
-                // Combinar salt y hash
-                var hashBytes = new byte[salt.Length + hash.Length];
-                Buffer.BlockCopy(salt, 0, hashBytes, 0, salt.Length);
-                Buffer.BlockCopy(hash, 0, hashBytes, salt.Length, hash.Length);
-
-                return hashBytes;
-            }
-        }
-
-        private bool VerifyPassword(string passwordInput, byte[] storedPassword)
-        {
-            // Asumiendo que los primeros 16-32 bytes son el salt y el resto es el hash
-            // Ajusta esto según tu implementación específica
-            const int saltSize = 16; // o 32 dependiendo de tu implementación
-
-            byte[] salt = new byte[saltSize];
-            byte[] hash = new byte[storedPassword.Length - saltSize];
-
-            // Extraer salt y hash del password almacenado
-            Buffer.BlockCopy(storedPassword, 0, salt, 0, saltSize);
-            Buffer.BlockCopy(storedPassword, saltSize, hash, 0, hash.Length);
-
-            // Calcular hash de la contraseña ingresada con el mismo salt
-            using (var hmac = new System.Security.Cryptography.HMACSHA512(salt))
-            {
-                var computedHash = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(passwordInput));
-
-                // Comparar los hashes
-                for (int i = 0; i < computedHash.Length; i++)
+                using (var sha256 = SHA256.Create())
                 {
-                    if (computedHash[i] != hash[i])
-                        return false;
+                    // Asegúrate de usar una codificación consistente
+                    byte[] bytes = Encoding.UTF8.GetBytes(password);
+                    byte[] hash = sha256.ComputeHash(bytes);
+
+                    // Para depuración, muestra el hash generado
+                    Console.WriteLine($"HashPassword generó: {BitConverter.ToString(hash)}");
+
+                    return hash;
                 }
             }
-
-            return true;
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error en HashPassword: {ex.Message}");
+                throw;
+            }
         }
 
+
+        // Modificación para VerifyPassword
+        private bool VerifyPassword(string passwordInput, byte[] storedPassword)
+        {
+            if (storedPassword == null || storedPassword.Length == 0)
+            {
+                Console.WriteLine("El hash almacenado es null o vacío");
+                return false;
+            }
+
+            try
+            {
+                using (var sha256 = SHA256.Create())
+                {
+                    byte[] hashIngresado = sha256.ComputeHash(Encoding.UTF8.GetBytes(passwordInput));
+
+                    // Usar un método más directo para comparar
+                    return storedPassword.SequenceEqual(hashIngresado);
+
+                    // O alternativamente:
+                    // return Convert.ToBase64String(storedPassword) == Convert.ToBase64String(hashIngresado);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error en VerifyPassword: {ex.Message}");
+                return false;
+            }
+        }
+        private bool CryptographicEquals(byte[] a, byte[] b)
+        {
+            if (a.Length != b.Length)
+                return false;
+
+            int result = 0;
+            for (int i = 0; i < a.Length; i++)
+            {
+                result |= a[i] ^ b[i];
+            }
+
+            return result == 0;
+        }
 
         private string GenerateJwtToken(Usuario usuario)
         {

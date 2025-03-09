@@ -1,32 +1,4 @@
-﻿//var builder = WebApplication.CreateBuilder(args);
-
-//// Add services to the container.
-
-//builder.Services.AddControllers();
-//// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-//builder.Services.AddEndpointsApiExplorer();
-//builder.Services.AddSwaggerGen();
-
-//var app = builder.Build();
-
-//// Configure the HTTP request pipeline.
-//if (app.Environment.IsDevelopment())
-//{
-//    app.UseSwagger();
-//    app.UseSwaggerUI();
-//}
-
-//app.UseHttpsRedirection();
-
-//app.UseAuthorization();
-
-//app.MapControllers();
-
-//app.Run();
-
-
-// Program.cs
-using BackendGestionUsuarios.API.Data;
+﻿using BackendGestionUsuarios.API.Data;
 using BackendGestionUsuarios.API.Repositories;
 using BackendGestionUsuarios.API.Services;
 using GestionUsuarios.API.Services;
@@ -38,16 +10,18 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configurar DbContext y habilitar logs de consultas SQL
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+                       ?? throw new InvalidOperationException("❌ Database connection string is not configured.");
+
+// ✅ Configurar DbContext con SQL Server
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"))
+    options.UseSqlServer(connectionString)
            .LogTo(Console.WriteLine, LogLevel.Information));
 
-// Agregar repositorios y servicios
 builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
 builder.Services.AddScoped<IUsuarioService, UsuarioService>();
 
-// Configurar CORS
+// ✅ Configurar CORS para permitir el frontend en Vue.js
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowVueApp", policy =>
@@ -58,7 +32,10 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Configurar JWT Authentication
+// ✅ Configurar autenticación JWT
+var jwtKey = builder.Configuration["Jwt:Key"]
+             ?? throw new InvalidOperationException("❌ JWT Key is not configured.");
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -70,19 +47,19 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true,
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
             ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
         };
     });
 
 builder.Services.AddControllers();
 
-// Configurar Swagger
+// ✅ Configurar Swagger con autenticación JWT
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "Gestión de Usuarios API", Version = "v1" });
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        Description = "JWT Authorization header usando el esquema Bearer",
+        Description = "JWT Authorization header usando el esquema Bearer. \nEjemplo: 'Bearer {token}'",
         Name = "Authorization",
         In = ParameterLocation.Header,
         Type = SecuritySchemeType.ApiKey,
@@ -106,7 +83,7 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
-// Verificar la conexión a la base de datos
+// ✅ Verificar conexión a la base de datos
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
@@ -129,7 +106,7 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// Configurar el pipeline de HTTP request
+// ✅ Configuración del entorno
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -141,5 +118,4 @@ app.UseCors("AllowVueApp");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
-
 app.Run();

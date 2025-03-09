@@ -18,7 +18,6 @@ namespace BackendGestionUsuarios.API.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            // Configuraciones adicionales
             modelBuilder.Entity<Usuario>()
                 .HasIndex(u => u.Cedula)
                 .IsUnique();
