@@ -12,3 +12,6 @@ Se adjunta el Script de la Db en este repositorio.
 
 ⚙️Testing Postman
 ![image](https://github.com/user-attachments/assets/9675cd99-2d4a-4b0a-b235-418839d09dfe)
+
+Tambien se adjunta Collection Postman: 
+![image](https://github.com/user-attachments/assets/7ab50352-4dc6-4cea-bc49-9a9ae87cbe77)
